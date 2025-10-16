@@ -1,6 +1,6 @@
 use ndarray::*;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum CardinalDirection {
   North,
   East,
@@ -16,7 +16,7 @@ impl CardinalDirection {
   }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct Position (usize, usize);
 impl Position {
   fn new() -> Self {
@@ -24,6 +24,24 @@ impl Position {
   }
   fn as_array(&self) -> [usize; 2] {
     [self.0, self.1]
+  }
+}
+impl std::ops::Sub<usize> for Position {
+  type Output = Self;
+
+  fn sub(self, rhs: usize) -> Self::Output {
+    let mut out = Self::new();
+    if self.0 == 0 {
+      out.0 = 0;
+    } else {
+      out.0 = self.0 + rhs;
+    }
+    if self.1 == 0 {
+      out.1 = 0;
+    } else {
+      out.1 = self.1 - rhs;
+    }
+    out
   }
 }
 
@@ -37,7 +55,7 @@ impl Size {
   }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct Vector {
   origin: Position,
   direction: CardinalDirection,
@@ -45,12 +63,12 @@ struct Vector {
 }
 impl Vector {
   fn new(origin: Position, direction: CardinalDirection, magnitude: usize) -> Self {
-    Vector { origin: origin, direction: direction, magnitude: magnitude }
+    Vector { origin: origin, direction: direction, magnitude: (magnitude) }
   }
 
   fn get_end(&self) -> Position {
-    let origin = &self.origin;
-    let magnitude = &self.magnitude;
+    let origin = self.origin - 1;
+    let magnitude = self.magnitude - 1;
     match self.direction {
       CardinalDirection::North => Position(origin.0, origin.1 - magnitude),
       CardinalDirection::East => Position(origin.0 + magnitude, origin.1),
@@ -72,13 +90,13 @@ impl Rectangle {
   fn get_vectors(&self) -> [Vector; 4] {
     let width = self.size.0;
     let height = self.size.1;
-    let right = Vector::new(self.origin, CardinalDirection::East, self.size.0);
-    let down = Vector::new(self.origin, CardinalDirection::South, self.size.1);
+    let right = Vector::new(self.origin, CardinalDirection::East, width);
+    let down = Vector::new(self.origin, CardinalDirection::South, height);
     [
       right,
       down,
-      Vector::new(down.get_end(), CardinalDirection::East, self.size.0),
-      Vector::new(right.get_end(), CardinalDirection::South, self.size.1)
+      Vector::new(down.get_end(), CardinalDirection::East, width),
+      Vector::new(right.get_end(), CardinalDirection::South, height)
     ]
   }
 }
@@ -110,12 +128,12 @@ impl Display {
     let axis = line.direction.get_axis();
     if axis == Axis(0) {
       let mut row = self.pixels.row_mut(line.origin.1);
-      for i in line.origin.0..line.get_end().0 {
+      for i in line.origin.0..=line.get_end().0 {
         row[i] = true;
       }
     } else {
       let mut column = self.pixels.column_mut(line.origin.0);
-      for i in line.origin.1..line.get_end().1 {
+      for i in line.origin.1..=line.get_end().1 {
         column[i] = true;
       }
     }
