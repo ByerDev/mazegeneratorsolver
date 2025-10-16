@@ -71,7 +71,7 @@ impl Rectangle {
 
   fn get_vectors(&self) -> [Vector; 4] {
     let width = self.size.0;
-    let height = self.size.1
+    let height = self.size.1;
     let right = Vector::new(self.origin, CardinalDirection::East, self.size.0);
     let down = Vector::new(self.origin, CardinalDirection::South, self.size.1);
     [
