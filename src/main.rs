@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
+
 #[derive(Clone)]
 struct Tile {
     sides: HashMap<CardinalDirection, bool>,
@@ -24,7 +25,6 @@ struct Maze {
     tiles: Array2<Tile>,
     solvedPath: Vec<Position>,
 }
-
 impl Maze {
     fn new(size: Size) -> Self {
         Self {
@@ -64,6 +64,7 @@ impl Maze {
         newTile
     }
 }
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
 enum CardinalDirection {
