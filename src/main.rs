@@ -8,13 +8,13 @@ use strum_macros::EnumIter;
 
 #[derive(Clone)]
 struct Tile {
-    sides: HashMap<CardinalDirection, bool>,
+    sides: HashMap<Direction, bool>,
 }
 impl Tile {
     fn new() -> Self {
         let mut sides = HashMap::new();
 
-        for side in CardinalDirection::iter() {
+        for side in Direction::iter() {
             sides.insert(side, false);
         }
         Self { sides: sides }
@@ -35,32 +35,35 @@ impl Maze {
         }
     }
 
-    fn get_adj_tile_sides(&self, pos: Position) -> HashMap<CardinalDirection, &Tile> {
+    fn get_adj_tiles(&self, pos: Position) -> HashMap<Direction, Tile> {
         let mut out = HashMap::new();
-        if pos == Position(0,0) {
-            out.insert(CardinalDirection::)
-        } else if pos.0 == 0 {
-            
-        } else if pos.1 == 0 {
-            
-        } else if pos.as_array() == self.size.as_array() {
-            
-        } else if pos.0 == self.size.0 {
-            
-        } else if pos.1 == self.size.1 {
-            
-        } else {
-            HashMap::from([
-                (CardinalDirection::North, &self.tiles[[pos.0, pos.1 - 1]]),
-                (CardinalDirection::East, &self.tiles[[pos.0 + 1, pos.1]]),
-                (CardinalDirection::South, &self.tiles[[pos.0, pos.1 + 1]]),
-                (CardinalDirection::West, &self.tiles[[pos.0 - 1, pos.1]]),
-            ])
+        if pos.0 == 0 {
+            out.insert(Direction::West, Tile::new());
         }
+        if pos.1 == 0 {
+            out.insert(Direction::North, Tile::new());
+        }
+        if pos.0 == self.size.0 {
+            out.insert(Direction::East, Tile::new());
+        }
+        if pos.1 == self.size.1 {
+            out.insert(Direction::South, Tile::new());
+        }
+        for direction in Direction::iter() {
+            if !out.contains_key(&direction) {
+                out.insert(direction, match direction {
+                    Direction::North => self.tiles[[pos.0, pos.1+1]].clone(),
+                    Direction::East => self.tiles[[pos.0+1, pos.1]].clone(),
+                    Direction::South => self.tiles[[pos.0, pos.1-1]].clone(),
+                    Direction::West => self.tiles[[pos.0-1, pos.1]].clone(),
+                });
+            }
+        }
+        out
     }
 
-    fn get_req_walls(&self, pos: Position) -> HashMap<CardinalDirection, bool> {
-        let mut out = HashMap::<CardinalDirection, bool>::new();
+    fn get_req_walls(&self, pos: Position) -> HashMap<Direction, bool> {
+        let mut out = HashMap::<Direction, bool>::new();
         for (direction, tile) in self.get_adj_tiles(pos) {
             out.insert(
                 direction,
@@ -84,13 +87,13 @@ impl Maze {
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
-enum CardinalDirection {
+enum Direction {
     North,
     East,
     South,
     West,
 }
-impl CardinalDirection {
+impl Direction {
     fn get_axis(&self) -> Axis {
         match self {
             Self::East | Self::West => Axis(0),
@@ -151,11 +154,11 @@ impl Size {
 #[derive(Debug, Clone, Copy)]
 struct Vector {
     origin: Position,
-    direction: CardinalDirection,
+    direction: Direction,
     magnitude: usize,
 }
 impl Vector {
-    fn new(origin: Position, direction: CardinalDirection, magnitude: usize) -> Self {
+    fn new(origin: Position, direction: Direction, magnitude: usize) -> Self {
         Vector {
             origin: origin,
             direction: direction,
@@ -167,10 +170,10 @@ impl Vector {
         let origin = self.origin - 1;
         let magnitude = self.magnitude - 1;
         match self.direction {
-            CardinalDirection::North => Position(origin.0, origin.1 - magnitude),
-            CardinalDirection::East => Position(origin.0 + magnitude, origin.1),
-            CardinalDirection::South => Position(origin.0, origin.1 + magnitude),
-            CardinalDirection::West => Position(origin.0 - magnitude, origin.1),
+            Direction::North => Position(origin.0, origin.1 - magnitude),
+            Direction::East => Position(origin.0 + magnitude, origin.1),
+            Direction::South => Position(origin.0, origin.1 + magnitude),
+            Direction::West => Position(origin.0 - magnitude, origin.1),
         }
     }
 }
@@ -190,13 +193,13 @@ impl Rectangle {
     fn get_vectors(&self) -> [Vector; 4] {
         let width = self.size.0;
         let height = self.size.1;
-        let right = Vector::new(self.origin, CardinalDirection::East, width);
-        let down = Vector::new(self.origin, CardinalDirection::South, height);
+        let right = Vector::new(self.origin, Direction::East, width);
+        let down = Vector::new(self.origin, Direction::South, height);
         [
             right,
             down,
-            Vector::new(down.get_end(), CardinalDirection::East, width),
-            Vector::new(right.get_end(), CardinalDirection::South, height),
+            Vector::new(down.get_end(), Direction::East, width),
+            Vector::new(right.get_end(), Direction::South, height),
         ]
     }
 }
