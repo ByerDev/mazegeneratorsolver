@@ -1,6 +1,71 @@
-use ndarray::*;
+#![allow(non_snake_case)]
 
-#[derive(Debug, Clone, Copy)]
+use ndarray::*;
+use std::collections::HashMap;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
+
+#[derive(Clone)]
+struct Tile {
+    sides: HashMap<CardinalDirection, bool>,
+}
+impl Tile {
+    fn new() -> Self {
+        let mut sides = HashMap::new();
+
+        for side in CardinalDirection::iter() {
+            sides.insert(side, false);
+        }
+        Self { sides: sides }
+    }
+}
+
+struct Maze {
+    tiles: Array2<Tile>,
+    solvedPath: Vec<Position>,
+}
+
+impl Maze {
+    fn new(size: Size) -> Self {
+        Self {
+            tiles: Array2::from_elem(size.as_array(), Tile::new()),
+            solvedPath: vec![Position(0, 0)],
+        }
+    }
+
+    fn get_adj_tiles(&self, pos: Position) -> HashMap<CardinalDirection, &Tile> {
+        HashMap::from([
+            (CardinalDirection::North, &self.tiles[[pos.0, pos.1 - 1]]),
+            (CardinalDirection::East, &self.tiles[[pos.0 + 1, pos.1]]),
+            (CardinalDirection::South, &self.tiles[[pos.0, pos.1 + 1]]),
+            (CardinalDirection::West, &self.tiles[[pos.0 - 1, pos.1]]),
+        ])
+    }
+
+    fn get_req_walls(&self, pos: Position) -> HashMap<CardinalDirection, bool> {
+        let mut out = HashMap::<CardinalDirection, bool>::new();
+        for (direction, tile) in self.get_adj_tiles(pos) {
+            out.insert(
+                direction,
+                *tile.sides.get(&direction.get_opposite()).unwrap(),
+            );
+        }
+        out
+    }
+
+    fn new_Tile(&mut self, pos: Position, tile: Tile) -> Tile {
+        let mut newTile = tile;
+        let req_walls = self.get_req_walls(pos);
+        for (side, wall) in newTile.sides.iter_mut() {
+            if *req_walls.get(&side).unwrap() {
+                *wall = true;
+            }
+        }
+        newTile
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
 enum CardinalDirection {
     North,
     East,
@@ -12,6 +77,15 @@ impl CardinalDirection {
         match self {
             Self::East | Self::West => Axis(0),
             Self::North | Self::South => Axis(1),
+        }
+    }
+
+    fn get_opposite(&self) -> Self {
+        match self {
+            Self::North => Self::South,
+            Self::East => Self::West,
+            Self::South => Self::North,
+            Self::West => Self::East,
         }
     }
 }

@@ -8,3 +8,5 @@ edition = "2021"
 
 [dependencies]
 ndarray = "0.17.0"
+strum = "0.27.2"
+strum_macros = "0.27.2"
