@@ -35,10 +35,10 @@ impl Maze {
         }
     }
 
-    fn get_adj_tiles(&self, pos: Position) -> HashMap<CardinalDirection, &Tile> {
-        let mut out = HashMap::from()
+    fn get_adj_tile_sides(&self, pos: Position) -> HashMap<CardinalDirection, &Tile> {
+        let mut out = HashMap::new();
         if pos == Position(0,0) {
-            
+            out.insert(CardinalDirection::)
         } else if pos.0 == 0 {
             
         } else if pos.1 == 0 {
