@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-
 #[derive(Clone)]
 struct Tile {
     sides: HashMap<Direction, bool>,
@@ -51,12 +50,15 @@ impl Maze {
         }
         for direction in Direction::iter() {
             if !out.contains_key(&direction) {
-                out.insert(direction, match direction {
-                    Direction::North => self.tiles[[pos.0, pos.1+1]].clone(),
-                    Direction::East => self.tiles[[pos.0+1, pos.1]].clone(),
-                    Direction::South => self.tiles[[pos.0, pos.1-1]].clone(),
-                    Direction::West => self.tiles[[pos.0-1, pos.1]].clone(),
-                });
+                out.insert(
+                    direction,
+                    match direction {
+                        Direction::North => self.tiles[[pos.0, pos.1 + 1]].clone(),
+                        Direction::East => self.tiles[[pos.0 + 1, pos.1]].clone(),
+                        Direction::South => self.tiles[[pos.0, pos.1 - 1]].clone(),
+                        Direction::West => self.tiles[[pos.0 - 1, pos.1]].clone(),
+                    },
+                );
             }
         }
         out
@@ -84,7 +86,6 @@ impl Maze {
         newTile
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
 enum Direction {
