@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
+
 #[derive(Clone)]
 struct Tile {
     sides: HashMap<CardinalDirection, bool>,
@@ -21,25 +22,41 @@ impl Tile {
 }
 
 struct Maze {
+    size: Size,
     tiles: Array2<Tile>,
     solvedPath: Vec<Position>,
 }
-
 impl Maze {
     fn new(size: Size) -> Self {
         Self {
+            size: size,
             tiles: Array2::from_elem(size.as_array(), Tile::new()),
             solvedPath: vec![Position(0, 0)],
         }
     }
 
-    fn get_adj_tiles(&self, pos: Position) -> HashMap<CardinalDirection, &Tile> {
-        HashMap::from([
-            (CardinalDirection::North, &self.tiles[[pos.0, pos.1 - 1]]),
-            (CardinalDirection::East, &self.tiles[[pos.0 + 1, pos.1]]),
-            (CardinalDirection::South, &self.tiles[[pos.0, pos.1 + 1]]),
-            (CardinalDirection::West, &self.tiles[[pos.0 - 1, pos.1]]),
-        ])
+    fn get_adj_tile_sides(&self, pos: Position) -> HashMap<CardinalDirection, &Tile> {
+        let mut out = HashMap::new();
+        if pos == Position(0,0) {
+            out.insert(CardinalDirection::)
+        } else if pos.0 == 0 {
+            
+        } else if pos.1 == 0 {
+            
+        } else if pos.as_array() == self.size.as_array() {
+            
+        } else if pos.0 == self.size.0 {
+            
+        } else if pos.1 == self.size.1 {
+            
+        } else {
+            HashMap::from([
+                (CardinalDirection::North, &self.tiles[[pos.0, pos.1 - 1]]),
+                (CardinalDirection::East, &self.tiles[[pos.0 + 1, pos.1]]),
+                (CardinalDirection::South, &self.tiles[[pos.0, pos.1 + 1]]),
+                (CardinalDirection::West, &self.tiles[[pos.0 - 1, pos.1]]),
+            ])
+        }
     }
 
     fn get_req_walls(&self, pos: Position) -> HashMap<CardinalDirection, bool> {
@@ -53,7 +70,7 @@ impl Maze {
         out
     }
 
-    fn new_Tile(&mut self, pos: Position, tile: Tile) -> Tile {
+    fn new_Tile(&self, pos: Position, tile: Tile) -> Tile {
         let mut newTile = tile;
         let req_walls = self.get_req_walls(pos);
         for (side, wall) in newTile.sides.iter_mut() {
@@ -64,6 +81,7 @@ impl Maze {
         newTile
     }
 }
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
 enum CardinalDirection {
@@ -90,7 +108,7 @@ impl CardinalDirection {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Position(usize, usize);
 impl Position {
     fn new() -> Self {
@@ -119,6 +137,7 @@ impl std::ops::Sub<usize> for Position {
     }
 }
 
+#[derive(Clone, Copy)]
 struct Size(usize, usize);
 impl Size {
     fn new(size: usize) -> Self {
