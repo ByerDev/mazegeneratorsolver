@@ -36,7 +36,7 @@ impl Maze {
     }
 
     fn get_adj_tiles(&self, pos: Position) -> HashMap<CardinalDirection, &Tile> {
-        let mut out = HashMap::new()
+        let mut out = HashMap::from()
         if pos == Position(0,0) {
             
         } else if pos.0 == 0 {
