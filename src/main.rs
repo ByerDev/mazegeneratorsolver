@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 
 use ndarray::*;
+use rand::prelude::*;
+use rand::rng;
 use std::collections::HashMap;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -10,11 +12,11 @@ struct Tile {
     sides: HashMap<Direction, bool>,
 }
 impl Tile {
-    fn new() -> Self {
+    fn new(walled: bool) -> Self {
         let mut sides = HashMap::new();
 
         for side in Direction::iter() {
-            sides.insert(side, false);
+            sides.insert(side, walled);
         }
         Self { sides: sides }
     }
@@ -26,36 +28,90 @@ struct Maze {
     solvedPath: Vec<Position>,
 }
 impl Maze {
-    fn new(size: Size) -> Self {
+    fn new(size: Size, walled: bool) -> Self {
         Self {
             size: size,
-            tiles: Array2::from_elem(size.as_array(), Tile::new()),
+            tiles: Array2::from_elem(size.as_array(), Tile::new(walled)),
             solvedPath: vec![Position(0, 0)],
         }
+    }
+
+    fn generate_maze(&mut self) {
+        let mut explored = vec![Position(0, 0)];
+        let mut stack = vec![Position(0, 0)];
+        let mut currentpos = Position(0, 0);
+        loop {
+            let mut dirs = self.get_valid_directions(currentpos);
+            for dir in dirs.clone() {
+                if explored.contains(&currentpos.translate(dir.clone())) {
+                    if let Some(index) = dirs.clone().iter().position(|value| *value == dir) {
+                        dirs.swap_remove(index);
+                    }
+                }
+            }
+            if dirs.is_empty() {
+                currentpos = stack.pop().unwrap();
+            } else {
+                let pick = *dirs.choose(&mut rng()).unwrap();
+                self.tiles[currentpos.as_array()].sides.insert(pick, false);
+                currentpos = currentpos.translate(pick);
+                self.tiles[currentpos.as_array()]
+                    .sides
+                    .insert(pick.get_opposite(), false);
+                stack.push(currentpos);
+                explored.push(currentpos);
+            }
+            if currentpos == Position::new() {
+                break;
+            }
+        }
+    }
+
+    fn get_valid_directions(&self, pos: Position) -> Vec<Direction> {
+        let mut invalid = vec![];
+        if pos.0 == 0 {
+            invalid.push(Direction::West);
+        }
+        if pos.1 == 0 {
+            invalid.push(Direction::North);
+        }
+        if pos.0 == self.size.0 - 1 {
+            invalid.push(Direction::East);
+        }
+        if pos.1 == self.size.1 - 1 {
+            invalid.push(Direction::South);
+        }
+        let mut out = vec![];
+        for direction in Direction::iter() {
+            if !invalid.contains(&direction) {
+                out.push(direction);
+            }
+        }
+        out
     }
 
     fn get_adj_tiles(&self, pos: Position) -> HashMap<Direction, Tile> {
         let mut out = HashMap::new();
         if pos.0 == 0 {
-            out.insert(Direction::West, Tile::new());
+            out.insert(Direction::West, Tile::new(false));
         }
         if pos.1 == 0 {
-            out.insert(Direction::North, Tile::new());
+            out.insert(Direction::North, Tile::new(false));
         }
-        if pos.0 == self.size.0 {
-            out.insert(Direction::East, Tile::new());
+        if pos.0 == self.size.0 - 1 {
+            out.insert(Direction::East, Tile::new(false));
         }
-        if pos.1 == self.size.1 {
-            out.insert(Direction::South, Tile::new());
+        if pos.1 == self.size.1 - 1 {
+            out.insert(Direction::South, Tile::new(false));
         }
         for direction in Direction::iter() {
             if !out.contains_key(&direction) {
                 out.insert(
                     direction,
                     match direction {
-                        Direction::North => self.tiles[[pos.0, pos.1 + 1]].clone(),
+                        Direction::North => self.tiles[[pos.0, pos.1 - 1]].clone(),
                         Direction::East => self.tiles[[pos.0 + 1, pos.1]].clone(),
-                        Direction::South => self.tiles[[pos.0, pos.1 - 1]].clone(),
+                        Direction::South => self.tiles[[pos.0, pos.1 + 1]].clone(),
                         Direction::West => self.tiles[[pos.0 - 1, pos.1]].clone(),
                     },
                 );
@@ -118,8 +174,20 @@ impl Position {
     fn new() -> Self {
         Position(0, 0)
     }
+
     fn as_array(&self) -> [usize; 2] {
         [self.0, self.1]
+    }
+
+    fn translate(&self, direction: Direction) -> Self {
+        let mut out = *self;
+        match direction {
+            Direction::North => out.1 -= 1,
+            Direction::East => out.0 += 1,
+            Direction::South => out.1 += 1,
+            Direction::West => out.0 -= 1,
+        };
+        out
     }
 }
 impl std::ops::Sub<usize> for Position {
@@ -253,10 +321,14 @@ impl Display {
             self.draw_line(vector);
         }
     }
+
+    fn drawMaze(&mut self, maze: Maze) {} // TODO
 }
 
 fn main() {
-    let mut display = Display::new(Position(1, 1), Size::new(10));
+    /* let mut display = Display::new(Position(1, 1), Size::new(10));
     display.draw_rect(Rectangle::new(Position::new(), Size::new(10)));
-    display.print();
+    display.print(); */
+    let mut maze = Maze::new(Size(10, 20), true);
+    maze.generate_maze();
 }
