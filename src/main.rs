@@ -4,6 +4,7 @@ use ndarray::*;
 use rand::prelude::*;
 use rand::rng;
 use std::collections::HashMap;
+use std::io;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -22,6 +23,7 @@ impl Tile {
     }
 }
 
+#[derive(Clone)]
 struct Maze {
     size: Size,
     tiles: Array2<Tile>,
@@ -166,6 +168,14 @@ impl Direction {
             Self::West => Self::East,
         }
     }
+
+    fn get_perpendicular(&self) -> [Self; 2] {
+        match self.get_axis() {
+            Axis(0) => [Self::North, Self::South],
+            Axis(1) => [Self::East, Self::West],
+            _ => panic!("Higher Axis"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -209,14 +219,19 @@ impl std::ops::Sub<usize> for Position {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Size(usize, usize);
 impl Size {
     fn new(size: usize) -> Self {
         Size(size, size)
     }
+    
     fn as_array(&self) -> [usize; 2] {
         [self.0, self.1]
+    }
+
+    fn as_rev_array(&self) -> [usize; 2] {
+        [self.1, self.0]
     }
 }
 
@@ -236,7 +251,7 @@ impl Vector {
     }
 
     fn get_end(&self) -> Position {
-        let origin = self.origin - 1;
+        let origin = self.origin;
         let magnitude = self.magnitude - 1;
         match self.direction {
             Direction::North => Position(origin.0, origin.1 - magnitude),
@@ -260,8 +275,8 @@ impl Rectangle {
     }
 
     fn get_vectors(&self) -> [Vector; 4] {
-        let width = self.size.0;
-        let height = self.size.1;
+        let width = self.size.0 - 1;
+        let height = self.size.1 - 1;
         let right = Vector::new(self.origin, Direction::East, width);
         let down = Vector::new(self.origin, Direction::South, height);
         [
@@ -276,12 +291,23 @@ impl Rectangle {
 struct Display {
     origin: Position,
     pixels: Array2<bool>,
+    size: Size,
 }
 impl Display {
     fn new(origin: Position, size: Size) -> Display {
         Display {
             origin: origin,
-            pixels: Array2::from_elem(size.as_array(), false),
+            pixels: Array2::from_elem(size.as_rev_array(), false),
+            size: size,
+        }
+    }
+
+    fn new_from_maze(origin: Position, maze: Maze) -> Self {
+        let size = Size(maze.size.0 * 2 + 2, maze.size.1 * 2 + 2);
+        Display {
+            origin: origin,
+            pixels: Array2::from_elem(size.as_rev_array(), false),
+            size: size,
         }
     }
 
@@ -305,13 +331,17 @@ impl Display {
         let axis = line.direction.get_axis();
         if axis == Axis(0) {
             let mut row = self.pixels.row_mut(line.origin.1);
-            for i in line.origin.0..=line.get_end().0 {
-                row[i] = true;
+            if line.get_end().0 > line.origin.0 {
+                for i in line.origin.0..=line.get_end().0 { row[i] = true; }
+            } else {
+                for i in line.get_end().0..=line.origin.0 { row[i] = true; }
             }
         } else {
             let mut column = self.pixels.column_mut(line.origin.0);
-            for i in line.origin.1..=line.get_end().1 {
-                column[i] = true;
+            if line.get_end().1 > line.origin.1 {
+                for i in line.origin.1..=line.get_end().1 { column[i] = true; }
+            } else {
+                for i in line.get_end().1..=line.origin.1 { column[i] = true; }
             }
         }
     }
@@ -322,13 +352,33 @@ impl Display {
         }
     }
 
-    fn drawMaze(&mut self, maze: Maze) {} // TODO
+    fn draw_maze(&mut self, maze: Maze) -> Result<(), std::io::ErrorKind> {
+        if Self::new_from_maze(self.origin, maze.clone()).size == self.size {
+            self.draw_rect(Rectangle::new(Position(0, 0), Size(self.size.0, self.size.1)));
+            for ((x, y), tile) in maze.tiles.indexed_iter() {
+                let display_pos = Position(x * 2 + 1, y * 2 + 1);
+                for (direction, wall) in tile.sides.clone() {
+                    if wall {
+                        let perpendicular = direction.get_perpendicular()[0];
+                        self.draw_line(Vector::new(
+                            display_pos.translate(direction).translate(perpendicular),
+                            perpendicular.get_opposite(),
+                            3
+                        ));
+                    }
+                }
+            }
+            Ok(())
+        } else {
+            Err(io::ErrorKind::InvalidInput)
+        }
+    }
 }
 
 fn main() {
-    /* let mut display = Display::new(Position(1, 1), Size::new(10));
-    display.draw_rect(Rectangle::new(Position::new(), Size::new(10)));
-    display.print(); */
-    let mut maze = Maze::new(Size(10, 20), true);
+    let mut maze = Maze::new(Size(20, 10), true);
+    let mut display = Display::new_from_maze(Position(1,1), maze.clone());
     maze.generate_maze();
+    display.draw_maze(maze).unwrap();
+    display.print();
 }
