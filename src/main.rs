@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![feature(iter_collect_into)]
 
 use ndarray::*;
 use rand::prelude::*;
@@ -7,6 +8,10 @@ use std::collections::HashMap;
 use std::io;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+use adjacent_pair_iterator::AdjacentPairIterator;
+
+const BLOCK_CHAR: char = '█';
+const POINT_CHAR: char = '•';
 
 #[derive(Clone)]
 struct Tile {
@@ -27,14 +32,12 @@ impl Tile {
 struct Maze {
     size: Size,
     tiles: Array2<Tile>,
-    solvedPath: Vec<Position>,
 }
 impl Maze {
     fn new(size: Size, walled: bool) -> Self {
         Self {
             size: size,
             tiles: Array2::from_elem(size.as_array(), Tile::new(walled)),
-            solvedPath: vec![Position(0, 0)],
         }
     }
 
@@ -43,14 +46,7 @@ impl Maze {
         let mut stack = vec![Position(0, 0)];
         let mut currentpos = Position(0, 0);
         loop {
-            let mut dirs = self.get_valid_directions(currentpos);
-            for dir in dirs.clone() {
-                if explored.contains(&currentpos.translate(dir.clone())) {
-                    if let Some(index) = dirs.clone().iter().position(|value| *value == dir) {
-                        dirs.swap_remove(index);
-                    }
-                }
-            }
+            let dirs = self.get_valid_directions(currentpos, explored.clone());
             if dirs.is_empty() {
                 currentpos = stack.pop().unwrap();
             } else {
@@ -69,7 +65,7 @@ impl Maze {
         }
     }
 
-    fn get_valid_directions(&self, pos: Position) -> Vec<Direction> {
+    fn get_valid_directions(&self, pos: Position, explored: Vec<Position>) -> Vec<Direction> {
         let mut invalid = vec![];
         if pos.0 == 0 {
             invalid.push(Direction::West);
@@ -85,7 +81,25 @@ impl Maze {
         }
         let mut out = vec![];
         for direction in Direction::iter() {
-            if !invalid.contains(&direction) {
+            if !invalid.contains(&direction) && !explored.contains(&pos.translate(direction)) {
+                out.push(direction);
+            }
+        }
+        out
+    }
+
+    fn get_valid_moves(&self, pos: Position, explored: Vec<Position>) -> Vec<Direction> {
+        let mut out = vec![];
+        let invalid: Vec<Direction> = self
+            .tiles[pos.as_array()]
+            .sides.iter()
+            .filter_map(
+                |(a,b)| if *b {
+                    Some(*a)
+                } else { None }
+            ).collect();
+        for direction in Direction::iter() {
+            if !invalid.contains(&direction) && !explored.contains(&pos.translate(direction)) {
                 out.push(direction);
             }
         }
@@ -143,6 +157,36 @@ impl Maze {
         }
         newTile
     }
+
+    fn solve_maze(&self) -> Vec<Position> { // Depth-First Search (DFS)
+        let goal = Position(self.size.0 - 1, self.size.1 - 1);
+        let mut path = vec![Position::new()];
+        let mut explored = vec![Position::new()];
+        let mut currentpos = Position::new();
+        let mut popped = false;
+        while currentpos != goal {
+            let moves = self.get_valid_moves(currentpos, explored.clone());
+            if moves.is_empty() {
+                currentpos = path.pop().unwrap();
+                popped = true;
+            } else {
+                if popped { path.push(currentpos); }
+                let direction = *moves.choose(&mut rng()).unwrap();
+                currentpos = currentpos.translate(direction);
+                path.push(currentpos);
+            }
+            explored.push(currentpos);
+        }
+        path.dedup();
+        path
+    }
+
+    fn to_display_pos(pos: Position) -> Position {
+        Position(
+            pos.0 * 2 + 1,
+            pos.1 * 2 + 1
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
@@ -187,6 +231,14 @@ impl Position {
 
     fn as_array(&self) -> [usize; 2] {
         [self.0, self.1]
+    }
+
+    fn as_rev_array(&self) -> [usize; 2] {
+        [self.1, self.0]
+    }
+    
+    fn from_array(arr: [usize; 2]) -> Self {
+        Self(arr[0], arr[1])
     }
 
     fn translate(&self, direction: Direction) -> Self {
@@ -246,8 +298,34 @@ impl Vector {
         Vector {
             origin: origin,
             direction: direction,
-            magnitude: (magnitude),
+            magnitude: magnitude,
         }
+    }
+
+    fn new_from_points(origin: Position, end: Position) -> Result<Self, io::ErrorKind> {
+        let mut magnitude: Vec<isize> = vec![];
+        end.as_array()
+            .iter()
+            .zip(origin.as_array())
+            .map(|(a,b)| *a as isize - b as isize)
+            .collect_into(&mut magnitude);
+        let mut unit: Vec<isize> = vec![];
+        magnitude.iter()
+            .map(|x| x.signum())
+            .collect_into(&mut unit);
+        let unit = (unit[0], unit[1]);
+        let direction = match unit {
+            (0,-1) => Ok(Direction::North),
+            (1,0) => Ok(Direction::East),
+            (0,1) => Ok(Direction::South),
+            (-1,0) => Ok(Direction::West),
+            _ => Err(io::ErrorKind::InvalidInput)
+        }?;
+        let magnitude: usize = magnitude.iter()
+            .map(|x| x.abs() as usize)
+            .reduce(|a,b| a+b)
+            .unwrap() + 1;
+        Ok(Self::new(origin, direction, magnitude))
     }
 
     fn get_end(&self) -> Position {
@@ -290,14 +368,14 @@ impl Rectangle {
 
 struct Display {
     origin: Position,
-    pixels: Array2<bool>,
+    pixels: Array2<char>,
     size: Size,
 }
 impl Display {
     fn new(origin: Position, size: Size) -> Display {
         Display {
             origin: origin,
-            pixels: Array2::from_elem(size.as_rev_array(), false),
+            pixels: Array2::from_elem(size.as_rev_array(), ' '),
             size: size,
         }
     }
@@ -306,7 +384,7 @@ impl Display {
         let size = Size(maze.size.0 * 2 + 2, maze.size.1 * 2 + 2);
         Display {
             origin: origin,
-            pixels: Array2::from_elem(size.as_rev_array(), false),
+            pixels: Array2::from_elem(size.as_rev_array(), ' '),
             size: size,
         }
     }
@@ -316,47 +394,43 @@ impl Display {
         for row in self.pixels.rows() {
             let mut rowstring = String::new();
             for pixel in row {
-                if *pixel {
-                    rowstring.push('#');
-                } else {
-                    rowstring.push(' ');
-                }
+                rowstring.push(*pixel);
             }
             print!("{}", " ".repeat(self.origin.0));
             println!("{}", rowstring);
         }
     }
 
-    fn draw_line(&mut self, line: Vector) {
+    fn draw_line(&mut self, line: Vector, symbol: char) {
         let axis = line.direction.get_axis();
         if axis == Axis(0) {
             let mut row = self.pixels.row_mut(line.origin.1);
             if line.get_end().0 > line.origin.0 {
-                for i in line.origin.0..=line.get_end().0 { row[i] = true; }
+                for i in line.origin.0..=line.get_end().0 { row[i] = symbol; }
             } else {
-                for i in line.get_end().0..=line.origin.0 { row[i] = true; }
+                for i in line.get_end().0..=line.origin.0 { row[i] = symbol; }
             }
         } else {
             let mut column = self.pixels.column_mut(line.origin.0);
             if line.get_end().1 > line.origin.1 {
-                for i in line.origin.1..=line.get_end().1 { column[i] = true; }
+                for i in line.origin.1..=line.get_end().1 { column[i] = symbol; }
             } else {
-                for i in line.get_end().1..=line.origin.1 { column[i] = true; }
+                for i in line.get_end().1..=line.origin.1 { column[i] = symbol; }
             }
         }
     }
 
     fn draw_rect(&mut self, rectangle: Rectangle) {
         for vector in rectangle.get_vectors() {
-            self.draw_line(vector);
+            self.draw_line(vector, BLOCK_CHAR);
         }
     }
 
-    fn draw_maze(&mut self, maze: Maze) -> Result<(), std::io::ErrorKind> {
+    fn draw_maze(&mut self, maze: Maze) -> Result<(), io::ErrorKind> {
         if Self::new_from_maze(self.origin, maze.clone()).size == self.size {
             self.draw_rect(Rectangle::new(Position(0, 0), Size(self.size.0, self.size.1)));
             for ((x, y), tile) in maze.tiles.indexed_iter() {
-                let display_pos = Position(x * 2 + 1, y * 2 + 1);
+                let display_pos = Maze::to_display_pos(Position(x, y));
                 for (direction, wall) in tile.sides.clone() {
                     if wall {
                         let perpendicular = direction.get_perpendicular()[0];
@@ -364,7 +438,7 @@ impl Display {
                             display_pos.translate(direction).translate(perpendicular),
                             perpendicular.get_opposite(),
                             3
-                        ));
+                        ), BLOCK_CHAR);
                     }
                 }
             }
@@ -373,12 +447,31 @@ impl Display {
             Err(io::ErrorKind::InvalidInput)
         }
     }
+
+    fn draw_path(&mut self, path: Vec<Position>) -> Result<(), io::ErrorKind> {
+        for (a,b) in path.adjacent_pairs() {
+            let vector = Vector::new_from_points(a,b)?;
+            self.draw_line(vector, POINT_CHAR);
+            self.draw_point(Position(1,0), POINT_CHAR);
+            self.draw_point(Position(self.size.0 - 3, self.size.1 - 2), POINT_CHAR);
+        }
+        Ok(())
+    }
+
+    fn draw_point(&mut self, pos: Position, symbol: char) {
+        self.pixels[pos.as_rev_array()] = symbol;
+    }
 }
 
 fn main() {
-    let mut maze = Maze::new(Size(20, 10), true);
+    let mut maze = Maze::new(Size(50,10), true);
     let mut display = Display::new_from_maze(Position(1,1), maze.clone());
     maze.generate_maze();
-    display.draw_maze(maze).unwrap();
+    display.draw_maze(maze.clone()).unwrap();
+    let solve: Vec<Position> = maze.solve_maze()
+        .iter()
+        .map(|x| Maze::to_display_pos(*x))
+        .collect();
+    display.draw_path(solve).unwrap();
     display.print();
 }
