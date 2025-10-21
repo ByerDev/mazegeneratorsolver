@@ -8,6 +8,7 @@ edition = "2021"
 
 [dependencies]
 adjacent-pair-iterator = "1.0.0"
+derive_more = { version = "2.0.1", features = ["as_ref"] }
 ndarray = "0.17.0"
 rand = "0.9.2"
 strum = "0.27.2"
