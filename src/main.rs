@@ -285,6 +285,10 @@ impl Size {
     fn as_rev_array(&self) -> [usize; 2] {
         [self.1, self.0]
     }
+
+    fn from_array(arr: [usize; 2]) -> Self {
+        Self(arr[0], arr[1])
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -464,7 +468,10 @@ impl Display {
 }
 
 fn main() {
-    let mut maze = Maze::new(Size(50,10), true);
+    let args: Vec<String> = std::env::args().collect();
+    let size = args[1].split_once("x").expect("Pass the dimension of your desired maze with 'AxY' (example: '10x20')");
+    let size = Size(str::parse(size.0).unwrap(), str::parse(size.1).unwrap());
+    let mut maze = Maze::new(size, true);
     let mut display = Display::new_from_maze(Position(1,1), maze.clone());
     maze.generate_maze();
     display.draw_maze(maze.clone()).unwrap();
