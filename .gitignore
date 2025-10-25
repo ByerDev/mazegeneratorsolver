@@ -1,2 +1,4 @@
 /target
-.replit
+/.replit
+/.cargo/.*
+/Cargo.lock
